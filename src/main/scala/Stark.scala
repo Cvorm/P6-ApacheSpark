@@ -9,6 +9,6 @@ class Stark {
   val conf = new SparkConf()
   conf.setAppName("GeoSparkRunnableExample") // Change this to a proper name
   conf.setMaster("local[*]")
-
+  System.out.println("hej");
 
 }
