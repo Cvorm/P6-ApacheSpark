@@ -64,6 +64,7 @@ object SpatialClassInference {
     case class Worm(coordinates: Array[Point])
     case class Polygon(points: Array[Point])
     case class Feature(geometry: Struct )
+
     def main(): Unit = {
 
       val simbaSession = SimbaSession
@@ -81,8 +82,27 @@ object SpatialClassInference {
     }
     private def FormatData(simba: SimbaSession):Unit = {
       import simba.implicits._
+      import org.apache.spark.sql.functions._
       val r: Regex = raw"""(\d*\.\d*),(\d*\.\d*)""".r
-      val df = simba.read.json("resources/output.geojson").drop("features(0)")
+      val df = simba.read.json("resources/output.geojson") //.drop("features(0)")
+      //df.printSchema()
+      //println("count: " + df.select(explode($"features")).count())
+      val ps = (0 until df.select(explode($"features")).count().toInt).map(x => {
+        val ds = df.selectExpr(s"features[$x].geometry.coordinates")
+        val reg = raw"""(\d*\.\d*),(\d*\.\d*)""".r
+        val group = reg.findAllIn(ds.toString())
+        group.hasNext
+        val points = for (j <- Array.range(0, reg.findAllIn(ds.toString()).length, 1)) yield {
+          var point = Point(Array(group.group(1).toDouble, group.group(2).toDouble))
+          group.next()
+          point
+        }
+        println(x)
+        points
+      }).toDS()
+      ps.printSchema()
+    }
+/*
       for(i <- 0 to df.select("features").count().toInt){
         val ds = df.selectExpr(s"features[$i].geometry.coordinates").map({
           str =>
@@ -97,8 +117,8 @@ object SpatialClassInference {
             points
         })
         println(i)
-      }
-    }
+      }*/
+
     private def runKnnQuery(simba: SimbaSession): Unit = {
       import org.apache.spark.sql.functions.udf
       import simba.implicits._
