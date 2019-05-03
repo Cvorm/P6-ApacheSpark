@@ -2,13 +2,18 @@ import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import java.util.ArrayList;
+import org.apache.log4j.Logger;
+import org.apache.log4j.Level;
+
 
 public class Main {
     public static void main(String[] args) {
+        Logger.getLogger("org").setLevel(Level.OFF);
+        Logger.getLogger("akka").setLevel(Level.OFF);
         System.out.println("Program started");
         /*Load input data into JsonArray*/
         ReadJSON p = new ReadJSON();
-        ArrayList data = p.LoadData();
+//        ArrayList data = p.LoadData();
         //System.out.println(data);
         //p.LoadDataSimba();
         /*Load data into RDD*/

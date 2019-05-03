@@ -68,7 +68,7 @@ object Simba {
         .config("simba.join.partitions", "20")
         .getOrCreate()
 
-      runRangeQuery(simbaSession)
+//      runRangeQuery(simbaSession)
       runKnnQuery(simbaSession)
       //runJoinQUery(simbaSession)
       simbaSession.stop()
@@ -95,16 +95,34 @@ object Simba {
       val pattern: Regex = """(\\d*\\.\\d*),(\\d*\\.\\d*)*""".r
       //val groups = df.select("features.geometry.coordinates").as[Point] //attern.findFirstMatchIn(ds.map(x => x.coordinates(0)).map(y => y(0)).toString())// (\d*\.\d......),(\d*\.\d......)
       val waht = df.selectExpr("features.geometry.coordinates[1][0]")
-      waht.foreach(x=> println(x))
-      waht.show(10)
+//      waht.foreach(x=> println(x))
+//      waht.show(10)
       //val pattern(x, y) = waht.take(100)
-      println(waht)
-      val mapped = ds.map(x => x.coordinates(0)).map(y => y(0)).foreach(x => println(x.take(500)))//.map(x => x.trim.split(","))//.filter(x => x.toString.matches("[0-9]")) //.map(x => x.split(",")
+//      println(waht)
+//      val mapped = ds.map(x => x.coordinates(0)).map(y => y(0)).foreach(x => println(x.take(500)))//.map(x => x.trim.split(","))//.filter(x => x.toString.matches("[0-9]")) //.map(x => x.split(",")
       //val mapped2 = mapped.foreach(x=> x.map(_.toDouble)) //println(pattern.findAllIn(x))) // "\\[(\\d*\\.\\d......),(\\d*\\.\\d......)", 1))
       //mapped.flatMap(s => scala.util.Try(s.toDouble).toOption)
       /*mapped match {
         case pattern(x, y) => "$x, $y" case _ => "No match"
       }*/
+
+      val dataframe = simba.read.json("resources/output.geojson")
+      val test2 = dataframe.select("features.geometry.coordinates", "features.geometry.type")
+      test2.show(10);
+
+      val dataframeCoor = dataframe.select(explode(dataframe("features.geometry.coordinates")))
+      val dataframeType = dataframe.select("features.geometry.type")
+
+      val countDf = dataframeType.count()
+      val dfPolygons = Nil
+      val arrayPoly[Worm] = Nil
+
+      for(count <- 0 to countDf){
+        arrayPoly += Worm(dataframeCoor.selectExpr("coordinates[count]"),dataframeType.selectExpr("type[count]"))
+      }
+
+      for(coor <- dataframeCoor("features.geometry.coordinates"))
+      dataframeCoor.show()
 
       //mapped.printSchema()
       //val mapped2 = mapped.filter(x=> x.matches("\\d*\\.\\d*")).collect().map(x => x.toDouble)
@@ -133,7 +151,7 @@ object Simba {
         //Point(13.652813,51.1097747), Point( 13.6529596,51.1097375))))
       //val polygonClassDS = Polygon(Array(df.select("features.geometry.coordinates")))
      //val test = df.flatMap(polygon => polygon.coordinates)
-      df.show(10)
+//      df.show(10)
       //val result = RDD[Polygon] = df.filter()
       //val what = df.flatMap(x => Polygon(x.toString()))
       //val features = df.select("features")
@@ -146,7 +164,7 @@ object Simba {
       //val features = df.select($"features.geometry.type")
       //val features2 = df.select($"features.geometry.coordinates")
       //features.show(10)
-      df.show(10)
+//      df.show(10)
 
 
       //val testvar = Polygon(features.select($"geometry.type").toString())
