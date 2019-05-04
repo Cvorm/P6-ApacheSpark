@@ -10,7 +10,7 @@ object Simba {
   case class Pointx(d: Double, d1: Double)
   //case class PointData(x: Double, y:Double, z:Double, other:String)
   case class PointData(p: Point, payload: Int)
-
+  case class Feature(geometry : Array[Array[Array[Double]]])
   def Build(): Unit = {
     val simbaSession = SimbaSession
       .builder()
@@ -54,16 +54,16 @@ object SpatialClassInference {
     val ps = (0 until 10000).map(x => PointData(Point(Array(x.toDouble, x.toDouble)), x + 1)).toDS
     ps.knn("p", Array(1.0, 1.0), 4).show()
     ps.printSchema()
-    ps.range("p", Array(1.0, 2.0), Array(4.0, 5.0)).show()
+    ps.range("p", Array(1.0, 2.0), Array(4.0, 5.0)).show(
+
+    )
   }
 }
   object BasicSpatialOps {
     case class Pointy(x: Double, y: Double)
     //case class PointData(x: Double, y: Double, z:Double, other: String)
     case class PointData(p: Point, payload: Int)
-    case class Worm(coordinates: Array[Point])
-    case class Polygon(points: Array[Point])
-    case class Feature(geometry: Struct )
+    case class Polygony(polygon: Array[Point])
 
     def main(): Unit = {
 
@@ -82,43 +82,31 @@ object SpatialClassInference {
     }
     private def FormatData(simba: SimbaSession):Unit = {
       import simba.implicits._
+      import simba.simbaImplicits._
       import org.apache.spark.sql.functions._
       val r: Regex = raw"""(\d*\.\d*),(\d*\.\d*)""".r
-      val df = simba.read.json("resources/output.geojson") //.drop("features(0)")
-      //df.printSchema()
-      //println("count: " + df.select(explode($"features")).count())
-      val ps = (0 until df.select(explode($"features")).count().toInt).map(x => {
-        val ds = df.selectExpr(s"features[$x].geometry.coordinates")
-        val reg = raw"""(\d*\.\d*),(\d*\.\d*)""".r
-        val group = reg.findAllIn(ds.toString())
-        group.hasNext
-        val points = for (j <- Array.range(0, reg.findAllIn(ds.toString()).length, 1)) yield {
-          var point = Point(Array(group.group(1).toDouble, group.group(2).toDouble))
-          group.next()
-          point
-        }
-        println(x)
-        points
-      }).toDS()
-      ps.printSchema()
-    }
-/*
-      for(i <- 0 to df.select("features").count().toInt){
-        val ds = df.selectExpr(s"features[$i].geometry.coordinates").map({
-          str =>
-            val reg = raw"""(\d*\.\d*),(\d*\.\d*)""".r
-            val group = reg.findAllIn(str.toString())
-            group.hasNext
-            val points = for(j <- Array.range(0,reg.findAllIn(str.toString()).length,1)) yield {
-              var point = Point(Array(group.group(1).toDouble,group.group(2).toDouble))
-              group.next()
+      val df = simba.read.json("resources/output.geojson")
+      val len = df.select(explode($"features")).count().toInt
+      val dfPoly = (1 until 50).map({//
+        x =>
+          val ds = df.selectExpr(s"features[$x].geometry.coordinates").map({
+            y =>
+            val g = r.findAllIn(y.toString())
+            g.hasNext
+            val points = for (j <- Array.range(0,  r.findAllIn(y.toString()).length , 1)) yield {
+              var point = Pointy(g.group(1).toDouble,g.group(2).toDouble)
+              g.next()
               point
             }
-            points
-        })
-        println(i)
-      }*/
-
+            points :+ points(0)
+          })
+          val k = ds.collect.flatMap(x=> x.map(y => Point(Array(y.x, y.y))))
+          Polygon(k)
+      }).toDS()
+      dfPoly.printSchema()
+      dfPoly.show(10,false)
+      dfPoly.knn("value", Array(15.0, 14.0), 3).show(10,false)
+    }
     private def runKnnQuery(simba: SimbaSession): Unit = {
       import org.apache.spark.sql.functions.udf
       import simba.implicits._
@@ -131,24 +119,27 @@ object SpatialClassInference {
       //val filted = df.selectExpr("features[11].geometry.coordinates[0]").foreach(y => pattern.findAllIn(y.toString()).matchData foreach(m => Point(m.group(1).toDouble, m.group(2).toDouble)))//)foreach(x=> println(x)) //.map(r => Work(r.toString().split(",")))
       //val filted2 = df.selectExpr("features[11].geometry.coordinates[0]").show(10,false)
       //val whatev = df.select("features").foreach( x=> for(i <- 1 to 3 ){println(x.[i])})
-      val getPoints = df.selectExpr("features[11].geometry.coordinates[0]").map({ //.selectExpr("features[11].geometry.coordinates[0]")
-        str =>
-          val reg = raw"""(\d*\.\d*),(\d*\.\d*)""".r
-          val gro = reg.findAllIn(str.toString())
-          gro.hasNext
-          val suck = for(i <- Array.range(0,reg.findAllIn(str.toString()).length,1)) yield {
-            //var p = PointData(Point(Array(gro.group(1).toDouble, gro.group(2).toDouble)), i +1)
-            var p = Point(Array(gro.group(1).toDouble,gro.group(2).toDouble))
-            gro.next()
-            p
-          }
-          suck
-      }).withColumnRenamed("value", "points").as[Polygon]
+      val getPoints = for (x <- 0 to 10) {
+        df.selectExpr(s"features[$x].geometry.coordinates[0]").map({ //.selectExpr("features[11].geometry.coordinates[0]")
+          str =>
+            val reg = raw"""(\d*\.\d*),(\d*\.\d*)""".r
+            val gro = reg.findAllIn(str.toString())
+            gro.hasNext
+            val suck = for (i <- Array.range(0, reg.findAllIn(str.toString()).length, 1)) yield {
+              //var p = PointData(Point(Array(gro.group(1).toDouble, gro.group(2).toDouble)), i +1)
+              var p = Point(Array(gro.group(1).toDouble, gro.group(2).toDouble))
+              gro.next()
+              p
+            }
+            suck
+
+        }).withColumnRenamed("value", "points").as[Polygon]
+      }
       //val su = getPoints.flatMap(y => y)
       //getPoints.knn(Array("points"), Array(14.00, 14.00), 1)
      //getPoints.select("coordinates").knn(Array("x","y"), Array(14.00, 14.00), 3)
-      getPoints.printSchema()
-      getPoints.show(10, false)
+      //getPoints.printSchema()
+      //getPoints.show(10, false)
       //getPoints.collect().foreach(println)
 
       //ds.limit(10).select("coordinates").take(10).foreach(println)
