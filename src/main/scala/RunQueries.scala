@@ -31,14 +31,15 @@ class RunQueries {
   }
 
   def RangeQueryWithRtree(spatial: SpatialRDD[Geometry], session: SparkSession): Unit ={
-    val rangeQueryWindow = new Envelope(-100, -100, 100, 100)
-    val considerBoundaryIntersection = false // Only return gemeotries fully covered by the window
+    val rangeQueryWindow = new Envelope(0, 200, 0, 200) //Coordinates for the lower left and upper right point for a BB!
+    val considerBoundaryIntersection = false // Only return geometries fully covered by the window
     val usingIndex = true
     var result = RangeQuery.SpatialRangeQuery(spatial, rangeQueryWindow, considerBoundaryIntersection, usingIndex)
     print("--Range Query result--\n")
+    print(result.take(10))
 //    var lul = Adapter.toDf(result[Geometry], session)
 //    lul.show()
-    print(result)
-
+//    print(result)
+    print(result.count())
   }
 }
