@@ -23,7 +23,10 @@ public class Main {
         SparkSession spark = new GeoSpark().GeosparkSession();
         SpatialRDD data = new SpatialRDD();
         data = new GeoSpark().GEOJsonFromFileToRDD("resources/formattedGeo2.geojson", spark);
-        new RunQueries().KNNQueryLul(data);
+        data = new RunQueries().BuildRtreeIndex(data);
+
+        new RunQueries().KNNQueryWithRtree(data);
+        new RunQueries().RangeQueryWithRtree(data, spark);
 
 //
 //
