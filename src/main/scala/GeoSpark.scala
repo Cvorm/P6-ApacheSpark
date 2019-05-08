@@ -39,9 +39,13 @@ class GeoSpark {
 //    data.write.json(newloc)
     val allowTopologyInvalidGeometris = true // Optional
     val skipSyntaxInvalidGeometries = false // Optional
-    val spatialRDD = GeoJsonReader.readToGeometryRDD(session.sparkContext, inputLocation, allowTopologyInvalidGeometris, skipSyntaxInvalidGeometries)
-//    var spatialDf = Adapter.toDf(spatialRDD, session)
-//    spatialDf.printSchema()
+    val spatialRDD = GeoJsonReader.readToGeometryRDD(session.sparkContext, inputLocation, allowTopologyInvalidGeometris, skipSyntaxInvalidGeometries) //Is on  the same format as a WKT string: POLYGON[...], ... , POLYGON[...]
+    println(spatialRDD)
+
+
+    var spatialDf = Adapter.toDf(spatialRDD, session)
+    spatialDf.show(10)
+
 //    val counddd = spatialDf.count()
 //    print(counddd)
     return spatialRDD

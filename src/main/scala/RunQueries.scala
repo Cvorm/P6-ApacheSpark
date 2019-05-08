@@ -40,6 +40,6 @@ class RunQueries {
 //    var lul = Adapter.toDf(result[Geometry], session)
 //    lul.show()
 //    print(result)
-    print(result.count())
+//    print(result.count())
   }
 }
