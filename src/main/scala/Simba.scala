@@ -1,10 +1,17 @@
 import java.sql.Struct
 
 import BasicSpatialOps.Pointy
-import org.apache.spark.sql.DataFrame
+import com.esotericsoftware.kryo.Kryo
+import com.vividsolutions.jts.geom.Geometry
+import io.netty.handler.codec.marshalling.CompatibleMarshallingEncoder
+import javax.validation.constraints.Digits
+import org.apache.spark.SparkConf
+import org.apache.spark.serializer.{KryoRegistrator, KryoSerializer}
+import org.apache.spark.sql.{DataFrame, Row}
 import org.apache.spark.sql.simba.index.{RTreeType, TreapType}
-import org.apache.spark.sql.simba.spatial.{Point, Polygon, Shape}
-import org.apache.spark.sql.simba.{Dataset, SimbaSession, spatial}
+import org.apache.spark.sql.simba.spatial.{Circle, LineSegment, MBR, Point, Polygon, Shape}
+import org.apache.spark.sql.simba.util.KryoShapeSerializer
+import org.apache.spark.sql.simba.{Dataset, ShapeSerializer, SimbaSession, spatial}
 
 import scala.collection.mutable.ArrayBuffer
 import scala.util.matching.Regex
@@ -29,56 +36,105 @@ object Simba {
   */
   }
 }
-
+class TestRegistrator
+  extends KryoRegistrator {
+  override def registerClasses(kryo: Kryo) {
+    //val kryo = new Kryo()
+    kryo.register(classOf[Shape], new KryoShapeSerializer)
+    kryo.register(classOf[Point], new KryoShapeSerializer)
+    kryo.register(classOf[MBR], new KryoShapeSerializer)
+    kryo.register(classOf[Polygon], new KryoShapeSerializer)
+    kryo.register(classOf[Circle], new KryoShapeSerializer)
+    kryo.register(classOf[LineSegment], new KryoShapeSerializer)
+    kryo.addDefaultSerializer(classOf[Shape], new KryoShapeSerializer)
+    kryo.setReferences(false)
+  }
+}
   object BasicSpatialOps {
     case class Pointy(x: Double, y: Double)
     //case class PointData(x: Double, y: Double, z:Double, other: String)
-    case class PointData(p: Point, payload: Int)
-    case class Polygony(polygon: Array[Point])
+    case class PointData(x: Double, y: Double)
+    case class PointData2(value: Seq[PointData])
+    case class Polygony(value: Array[Pointy])
 
     def main(): Unit = {
-
       val simbaSession = SimbaSession
         .builder()
         .master("local[4]")
         .appName("SparkSessionForSimba")
         .config("simba.join.partitions", "20")
+        .config("spark.serializer", classOf[KryoSerializer].getName)
+        //.config()
+        //.config("spark.kryo.registrator", classOf[TestRegistrator].getName)
         .getOrCreate()
-
+      //simbaSession.sparkContext.getConf.get("spark.kryo.registrator")
+      TestFunction(simbaSession)
+      //simbaSession.indexTable("b", RTreeType, "RtreeForData",  Array("coordinates") )
       //runRangeQuery(simbaSession)
       //runKnnQuery(simbaSession)
-      FormatData(simbaSession)
+      //FormatData(simbaSession)
       //runJoinQUery(simbaSession)
       simbaSession.stop()
     }
-    private def FormatData(simba: SimbaSession):Unit = {
+     def TestFunction(simba: SimbaSession) : Unit = {
+      import simba.implicits._
+      import simba.simbaImplicits._
+       val r: Regex = raw"""(\d*\.\d*),(\d*\.\d*)""".r
+       val df2 = simba.read.json("resources/test.json").as[Polygony]//.collect()(0).getInt(0)
+      val df = simba.read.json("resources/formattedGeo2.geojson").filter(x=>x(1) == "Polygon").map({
+        x=>
+        val g = r.findAllIn(x.toString()).matchData map {m => Pointy(m.group(1).toDouble,m.group(2).toDouble)}
+        //val pointa = g.toArray[PointData].map(x=> Point(Array(x.x, x.y)))
+          val pointArray = g.toArray[Pointy]
+          pointArray :+ pointArray(0)
+      }).as[Array[Pointy]] //.write.json("resources/succ.geojson") //.show(10, false)
+       val p = df2.collect()
+       val dsPolygon = (0 until p.length).map({ x =>
+         Polygon(p(x).value.map(i=> Point(Array(i.x, i.y))))
+       }).toDS()
+       val dsPoint = (0 until p.length).map({ x=>
+         val tmp = (0 until p(x).value.length).map(y => Point(Array(p(x).value(y).x, p(x).value(y).y)))
+         tmp.toArray
+       }).flatMap(d=>d).toDS()
+       //dsPoint.show(10,false)
+       //dsPoint.printSchema()
+       dsPolygon.foreach(x=> print(x.getMBR))
+       dsPolygon.index(RTreeType, "indexname", Array("value")).show(10,false)
+       dsPolygon.knn("value", Array(15.0, 14.1), 3).show(3)
+       dsPolygon.range("value",Array(13.7, 50.0),Array(16.0, 52.0)).show(10,false)
+       //dsPoint.index(RTreeType, "index", Array("value"))
+       //dsPoint.createOrReplaceTempView("b")
+       //simba.indexTable("b", RTreeType, "RtreeForData",  Array("value") )
+       dsPoint.collect()
+    }
+    def FormatData(simba: SimbaSession):Unit = {
       import simba.implicits._
       import simba.simbaImplicits._
       import org.apache.spark.sql.functions._
-      val r: Regex = raw"""(\d*\.\d*),(\d*\.\d*)""".r
-      val df = simba.read.json("resources/output.geojson")
-      val len = df.select(explode($"features")).count().toInt
-      val dfPoly = (1 until 10).map({//
+      val r: Regex = raw"""(\d*\.\d*),(\d*\.\d*)""".r //Reg.exp used for getting string X and Y values
+      val df = simba.read.json("resources/output.geojson") //Load data
+      val len = df.select(explode($"features")).count().toInt -1 //Lenght of DataFrame, used in loop
+      val dfPoly = (1 until len).map({ //Maps each feature to a polygon
         x =>
-          val ds = df.selectExpr(s"features[$x].geometry.coordinates").map({
+          val ds = df.selectExpr(s"features[$x].geometry.coordinates").map({ //Selects x features coordinates
             y =>
-            val g = r.findAllIn(y.toString())
+            val g = r.findAllIn(y.toString()) //Finds all Points in row
             g.hasNext
             val points = for (j <- Array.range(0,  r.findAllIn(y.toString()).length , 1)) yield {
               var point = Pointy(g.group(1).toDouble,g.group(2).toDouble)
               g.next()
               point
             }
-            points :+ points(0)
+            points :+ points(0) //Adds first point to end, such that it satisfies polygon criteria
           })
-          val i = ds.index(RTreeType,"test", Array("value"))
-          val k = ds.collect.flatMap(x=> x.map(y => Point(Array(y.x, y.y))))
+         // val i = ds.index(RTreeType,"test", Array("value"))
+          val k = ds.collect.flatMap(x=> x.map(y => Point(Array(y.x, y.y)))) //Collects and flattens dataframe created
           Polygon(k)
       }).toDS()
       dfPoly.printSchema()
       dfPoly.show(10,false)
       //dfPoly.knn("value", Array(15.0, 14.0), 3).show(10,false)
-      return dfPoly
+      //return dfPoly
     }
     private def runKnnQuery(simba: SimbaSession): Unit = {
       import org.apache.spark.sql.functions.udf
@@ -89,113 +145,5 @@ object Simba {
 
     }
   }
-object IndexExample {
-  case class PointData(x: Double, y: Double, z: Double, other: String)
 
-  def main(): Unit = {
-    val simbaSession = SimbaSession
-      .builder()
-      .master("local[4]")
-      .appName("IndexExample")
-      .config("simba.index.partitions", "64")
-      .getOrCreate()
 
-    useIndex2(simbaSession)
-    FormatData(simbaSession)
-    //useIndex1(simbaSession)
-
-    //simbaSession.stop()
-  }
-  private def FormatData(simba: SimbaSession):Unit = {
-    import simba.implicits._
-    import simba.simbaImplicits._
-    import org.apache.spark.sql.functions._
-    org.apache.spark.sql.simba.index.RTree
-    val r: Regex = raw"""(\d*\.\d*),(\d*\.\d*)""".r
-    val df = simba.read.json("resources/output.geojson")
-    val len = df.select(explode($"features")).count().toInt
-    val test : Dataset[Array[PointData]] = null
-    val dfPoly = (1 until 5).map({ //
-      x =>
-        val ds = df.selectExpr(s"features[$x].geometry.coordinates").map({
-          y =>
-            val g = r.findAllIn(y.toString())
-            g.hasNext
-            val points = for (j <- Array.range(0, r.findAllIn(y.toString()).length, 1)) yield {
-              var point = Pointy(g.group(1).toDouble, g.group(2).toDouble)
-              g.next()
-              point
-            }
-            points :+ points(0)
-        })
-        ds.printSchema()
-        //val i = ds.toDF().index(RTreeType,"test", Array("coordinates"))
-        //test = ds.flatMap(x => x.map(y => Seq(PointData(y.x, y.y, 1.1, "rtes"))))
-        val k:Seq[PointData] = ds.collect.flatMap(x => x.map(y => PointData(y.x, y.y, 0, "1")))
-        k
-    }).toDS()
-    dfPoly.printSchema()
-
-    dfPoly.index(RTreeType,"what", Array("value"))
-    //simba.indexTable("b", RTreeType, "RtreeForData",  Array("$value", "value") )
-    dfPoly.printSchema()
-
-  }
-  private def buildIndex(simba: SimbaSession): Unit = {
-    import simba.implicits._
-    val df = FormatData(simba)
-    //df.createOrReplaceTempView("a")
-
-    simba.indexTable("a", RTreeType, "testqtree",  Array("value(1)", "value(2)") )
-
-    simba.showIndex("a")
-  }
-
-  private def useIndex1(simba: SimbaSession): Unit = {
-    import simba.implicits._
-    import simba.simbaImplicits._
-    val datapoints = Seq(PointData(1.0, 1.0, 3.0, "1"),  PointData(2.0, 2.0, 3.0, "2"), PointData(2.0, 2.0, 3.0, "3"),
-      PointData(2.0, 2.0, 3.0, "4"),PointData(3.0, 3.0, 3.0, "5"),PointData(4.0, 4.0, 3.0, "6")).toDF()
-
-    datapoints.createOrReplaceTempView("b")
-
-    simba.indexTable("b", RTreeType, "RtreeForData",  Array("x", "y") )
-
-    simba.showIndex("b")
-
-    val res = simba.sql("SELECT * FROM b")
-    res.knn(Array("x", "y"),Array(1.0, 1.0),4).show(4)
-    println("stop")
-
-  }
-
-  private def useIndex2(simba: SimbaSession): Unit = {
-    import simba.implicits._
-    Polygon()
-    val datapoints = Seq(PointData(1.0, 1.0, 3.0, "1"),  PointData(2.0, 2.0, 3.0, "2"), PointData(2.0, 2.0, 3.0, "3"),
-      PointData(2.0, 2.0, 3.0, "4"),PointData(3.0, 3.0, 3.0, "5"),PointData(4.0, 4.0, 3.0, "6")).toDF()
-    val dp = Seq(Point(Array(1.0, 1.0)), Point(Array(4.0, 1.0)), Point(Array(3.0, 1.2)), Point(Array(1.0, 4.0)), Point(Array(2.0, 6.0))).toDF()
-    val dp = Seq(Polygon(Array(Point(Array(1.0, 1.0)), Point(Array(4.0, 1.0))), Polygon(Point(Array(3.0, 1.2))), Point(Array(1.0, 4.0)) )
-    dp.createOrReplaceTempView("b")
-    dp.printSchema()
-
-    simba.indexTable("b", RTreeType, "RtreeForData",  Array("value") )
-
-    simba.showIndex("b")
-
-    simba.sql("SELECT * FROM b where b.x >1 and b.y<=2").show(5)
-    println("stop")
-  }
-
-  private def useIndex3(simba: SimbaSession): Unit = {
-    import simba.implicits._
-    val datapoints = Seq(PointData(0.0, 1.0, 3.0, "1"),  PointData(2.0, 2.0, 3.0, "2"), PointData(2.0, 2.0, 3.0, "3"),
-      PointData(2.0, 2.0, 3.0, "4"),PointData(3.0, 3.0, 3.0, "5"),PointData(4.0, 4.0, 3.0, "6")).toDS()
-
-    import simba.simbaImplicits._
-
-    datapoints.index(TreapType, "indexForOneTable",  Array("x"))
-
-    datapoints.range(Array("x"),Array(1.0),Array(2.0)).show(4)
-  }
-}
