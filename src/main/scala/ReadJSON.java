@@ -1,3 +1,4 @@
+/*
 import java.io.FileNotFoundException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -13,7 +14,7 @@ public class ReadJSON {
       JsonParser parser = new JsonParser();
       InputStream inputSteam = getClass().getClassLoader().getResourceAsStream("sample.geojson");
       Reader reader = new InputStreamReader(inputSteam);
-      /*parser.parse(reader);*/
+      /*parser.parse(reader);
       JsonElement rootElement = parser.parse(reader);
       JsonObject rootObject = rootElement.getAsJsonObject();
       JsonPrimitive timestamp = rootObject.getAsJsonPrimitive("timestamp");
@@ -34,3 +35,4 @@ public class ReadJSON {
       System.out.println(array);
    }
 }
+*/
