@@ -12,49 +12,39 @@ import org.datasyslab.geospark.spatialRDD.*;
 
 
 public class Main {
-    public static void main(String[] args) {
+    public static void main(String[] args) {                  //Use main args for passing data into the functions:
+                                                              //1: Filepath to input file(string)
+                                                              //2: Knn number of neighbors to find(Integer)
+                                                              //3:
         Logger.getLogger("org").setLevel(Level.OFF);
         Logger.getLogger("akka").setLevel(Level.OFF);
         System.out.println("Program started");
 
-//        JavaFormatJson format = new JavaFormatJson();           /for making the fat data boi
+//--------------------------------------------------ONLY RUN FOR FORMATTING DATA--------------------------------------------------
+//        JavaFormatJson format = new JavaFormatJson();           //for making the fat data boi
 //        format.FormatGeoJson("resources/sample.geojson");
 
+
+//--------------------------------------------------CREATE SPARK AND RUN QUERIES--------------------------------------------------
+        String inputFilepath = args[0];
+        int k = Integer.parseInt(args[1]);
+
+        long startTime = System.nanoTime();
         SparkSession spark = new GeoSpark().GeosparkSession();
         SpatialRDD data = new SpatialRDD();
-//        SpatialRDD starkData = new SpatialRDD();
-        data = new GeoSpark().GEOJsonFromFileToRDD("resources/formattedGeo2.geojson", spark);
+
+//        data = new GeoSpark().GEOJsonFromFileToRDD("/f:/lululul.geojson", spark); ///f:/lululul.geojson
+        data = new GeoSpark().GEOJsonFromFileToRDD(inputFilepath, spark);
 //        new Stark().LoadDataStark("resources/formattedGeo2.geojson", spark);
 
+//--------------------------------------------------INDEX INTO R-TREE USING GEOSPARK AND RUN KNN AND RANGE QUERY--------------------------------------------------
         SpatialRDD dataIndexed = new RunQueries().BuildRtreeIndex(data);
 
-        new RunQueries().KNNQueryWithRtree(dataIndexed);
+        new RunQueries().KNNQueryWithRtree(dataIndexed,spark, k);
         new RunQueries().RangeQueryWithRtree(dataIndexed, spark);
 
-//
-//
-//        GeoSpark lul = new GeoSpark();
-
-
-
-//        /*Load input data into JsonArray*/
-//        ReadJSON p = new ReadJSON();
-////        ArrayList data = p.LoadData();
-//        //System.out.println(data);
-//        //p.LoadDataSimba();
-//        /*Load data into RDD*/
-//        BasicSpatialOps.main();
-//        //IndexExample.main();
+        long endTime = System.nanoTime();
+        System.out.println("RUNTIME TOTAL:" + ((endTime-startTime)/1000000) + " ms");
         System.out.println("Program ended");
-
     }
-//    public JavaSparkContext StartSpark(){
-//        /*Create a Java Spark Context */
-//        SparkConf conf = new SparkConf().setAppName("SPARK").setMaster("local[*]");
-//         return new JavaSparkContext(conf);
-//    }
-//    public JavaRDD LoadRDD(ArrayList data, JavaSparkContext sc) {
-//        JavaRDD<ArrayList> rdd = sc.parallelize(data);
-//        return rdd;
-//    }
 }

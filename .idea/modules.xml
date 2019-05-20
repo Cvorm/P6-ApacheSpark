@@ -2,8 +2,8 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/modules/P6-ApacheSpark.iml" filepath="$PROJECT_DIR$/.idea/modules/P6-ApacheSpark.iml" />
-      <module fileurl="file://$PROJECT_DIR$/.idea/modules/P6-ApacheSpark-build.iml" filepath="$PROJECT_DIR$/.idea/modules/P6-ApacheSpark-build.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/P6Geospark.iml" filepath="$PROJECT_DIR$/.idea/modules/P6Geospark.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/P6Geospark-build.iml" filepath="$PROJECT_DIR$/.idea/modules/P6Geospark-build.iml" />
     </modules>
   </component>
 </project>

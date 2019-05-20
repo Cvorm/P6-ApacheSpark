@@ -9,18 +9,13 @@ import org.datasyslab.geosparksql.utils.Adapter
 //import org.opengis.geometry.Geometry
 import com.vividsolutions.jts.geom.Geometry
 
+
 class GeoSpark {
   def GeosparkSession() : SparkSession = {
-//    val conf = new SparkConf()
-//    conf.setAppName("GeoSparkRunnableExample") // Change this to a proper name
-//    conf.setMaster("local[*]") // Delete this if run in cluster mode
-//    // Enable GeoSpark custom Kryo serializer
-//    conf.set("spark.serializer", classOf[KryoSerializer].getName)
-//    conf.set("spark.kryo.registrator", classOf[GeoSparkKryoRegistrator].getName)
-//    val sc = new SparkContext(conf)
-//    return sc
+
       var sparkSession = SparkSession.builder()
-        .master("local[*]") // Delete this if run in cluster mode
+//        .master("local[*]") // Delete this if run in cluster mode
+
         .appName("readTestScala") // Change this to a proper name
         // Enable GeoSpark custom Kryo serializer
         .config("spark.serializer", classOf[KryoSerializer].getName)
@@ -32,6 +27,11 @@ class GeoSpark {
   }
   def GEOJsonFromFileToRDD(filepath: String, session: SparkSession) : SpatialRDD[Geometry]={
     val inputLocation = filepath
+//    val df = session.read.parquet("resources/relation.parquet")
+////    df.show(10)
+//    df.printSchema()
+//    df.select("members").collect().foreach(println)
+//    df.write.parquet("resources/OSM.parquet")
 //    val data = session.read.json(filepath).drop("features(0)")
 //    data.
 //    data
@@ -40,11 +40,11 @@ class GeoSpark {
     val allowTopologyInvalidGeometris = true // Optional
     val skipSyntaxInvalidGeometries = false // Optional
     val spatialRDD = GeoJsonReader.readToGeometryRDD(session.sparkContext, inputLocation, allowTopologyInvalidGeometris, skipSyntaxInvalidGeometries) //Is on  the same format as a WKT string: POLYGON[...], ... , POLYGON[...]
-    println(spatialRDD)
+//    println(spatialRDD)
 
 
-    var spatialDf = Adapter.toDf(spatialRDD, session)
-    spatialDf.show(10)
+//    var spatialDf = Adapter.toDf(spatialRDD, session)
+//    spatialDf.show(10)
 
 //    val counddd = spatialDf.count()
 //    print(counddd)

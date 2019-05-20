@@ -19,11 +19,11 @@ public class JavaFormatJson {
         JSONParser parser = new JSONParser();
 
         try(Reader reader = new FileReader(filepath)){
-            try (FileWriter file = new FileWriter("formattedGeo2.geojson")) {
+            try (FileWriter file = new FileWriter("formattedGeo5.geojson")) {
 
                 JSONObject jsonObj = (JSONObject) parser.parse(reader);
                 JSONArray spatialData = (JSONArray) jsonObj.get("features");
-//            Iterator<String> iterator = spatialData.iterator();
+
                 JSONArray list = new JSONArray();
                 for (int i = 0; i < spatialData.size(); i++) {
                     JSONObject val = (JSONObject) spatialData.get(i);
@@ -33,23 +33,9 @@ public class JavaFormatJson {
                     file.write(System.lineSeparator());
                     list.add(lul);
                     list.add("\\n");
-//                System.out.println("succ");
+
                 }
             }
-//            JSONObject result = new JSONObject();
-//            try (FileWriter file = new FileWriter("formattedGeo.geojson")) {
-//
-//                file.write(list.toJSONString());
-////                file.flush();
-//
-//            } catch (IOException e) {
-//                e.printStackTrace();
-//            }
-//            while(iterator.hasNext()){
-//                String var = (iterator.next());
-//                System.out.println(var);
-//            }
-
 
         } catch (FileNotFoundException e) {
             e.printStackTrace();
