@@ -7,7 +7,7 @@ public class Main {
        // Logger.getLogger("akka").setLevel(Level.OFF);
         System.out.println("Program started");
         long startTime = System.nanoTime();
-        Simba.main(new String[] {"resources/lululul.json","5"}); //args[0] new String[] {"resources/lululul.json","5"}
+        Simba.main(args); //new String[] {"resources/lululul.json","5","20"}
         long endTime = System.nanoTime();
         System.out.println("RUNTIME:" + ((endTime-startTime)/1000000) + " ms");
         System.out.println("Program ended");
