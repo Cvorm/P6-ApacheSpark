@@ -31,28 +31,50 @@ object Simba {
       val p = points.map(ap => Polygon(ap :+ ap(0))) //Adds the first point of polygon to the end
       p
     }
+    val getPolygonDoubleUDF = udf{wa: mutable.WrappedArray[mutable.WrappedArray[mutable.WrappedArray[mutable.WrappedArray[Double]]]] =>
+      wa.map { x =>
+        val points = x.map { y =>
+          val p = y.map(z => Point(Array(z(0), z(1))))
+          val pointArray = p.toArray
+          pointArray
+        }
+      points.map(p => Polygon(p))
+      }
+    }
+    val getAllPointsUDF = udf{ s: mutable.WrappedArray[String] =>
+      val points = s.flatMap{x => val tmp = r.findAllIn(x.toString).matchData map(m => Array(m.group(1).toDouble, m.group(2).toDouble))
+        val pointArray = tmp.map( x=> Point(x))
+        //pointArray.foreach(println)
+        pointArray
+      }
+      val k = points.array.map(z=>z)
+      k
+    }
+    val getPointsDoubleUDF = udf{d: mutable.WrappedArray[Double] =>  Point(Array(d(0), d(1))) }
     /* Load data */
     val data = simbaSession.read.json(args(0)).select("geometry").persist()
-    data.printSchema()
+
     /*Run Point Experiment */
-    val pointDF = data.select("geometry.coordinates", "geometry.type").filter(entry => entry(1) == "Point").withColumn("coordinates", getPointUDF(col("coordinates"))).persist()
-    pointDF.printSchema()
+    val pointDF = data.select("geometry.coordinates", "geometry.type").filter(entry => entry(1) == "Point").withColumn("coordinates", getPointsDoubleUDF(col("coordinates"))).persist()
+    pointDF.show(10,false)
     val randomPointFromSet = pointDF.select("coordinates").as[Point].take(1).flatMap(x=> x.coord)
-    val rangeQueryWindow = Array(randomPointFromSet, Array(randomPointFromSet(0) + args(2).toDouble, randomPointFromSet(1) + args(2).toDouble))
-    val r1 = RunKNNPoint(simbaSession, pointDF, args(1).toInt, randomPointFromSet)
-    val r2 = RunRangePoint(simbaSession, pointDF, rangeQueryWindow)
-    val r3 = RunIndexPoint2(simbaSession, pointDF, args(1).toInt,randomPointFromSet, rangeQueryWindow)
+    val rangeQueryWindow = Array(randomPointFromSet, Array(randomPointFromSet(0) + args(3).toDouble, randomPointFromSet(1) + args(3).toDouble))
+
+    val r1 = RunKNNPoint(simbaSession, pointDF.select("coordinates"), args(2).toInt, randomPointFromSet) //randomPointFromSet
+    val r2 = RunRangePoint(simbaSession, pointDF.select("coordinates"), rangeQueryWindow) //rangeQueryWindow
+    val r3 = RunIndexPoint2(simbaSession, pointDF.select("coordinates"), args(2).toInt,randomPointFromSet, rangeQueryWindow)
     /*Run Polygon Experiment */
+    data.unpersist()
     pointDF.unpersist()
-    val polyDF = data.select("geometry.coordinates", "geometry.type").filter(x => x(1) == "MultiPolygon" || x(1) == "Polygon").withColumn("coordinates", getPolygonUDF(col("coordinates"))).persist()
-    val r4 = RunKNNPolygon(simbaSession, polyDF.select("coordinates"), args(1).toInt, randomPointFromSet)
-    //RunRangePolygon(simbaSession,  polyDF.select("coordinates"))
 
+    val polydata = simbaSession.read.json(args(1)).select("geometry").persist()
+    val polyDF = polydata.select("geometry.coordinates", "geometry.type").filter(x => x(1) == "MultiPolygon" || x(1) == "Polygon").withColumn("coordinates", getPolygonDoubleUDF(col("coordinates"))).persist()
+    //polyDF.show(10,false)
+    val r4 = RunKNNPolygon(simbaSession, polyDF.select("coordinates"), args(2).toInt, randomPointFromSet)
+    //RunRangePolygon(simbaSession,  polyDF.select("coordinates")) NOT SUPPORTED
     println(r1, r2, r3, r4, "POINT DF COUNT: " + pointDF.count() + "\nPOLYGON DF COUNT: " + polyDF.count() + "\nPoint: " + randomPointFromSet(0), randomPointFromSet(1) + "\nRange window: " + rangeQueryWindow(0)(0),rangeQueryWindow(0)(1),rangeQueryWindow(1)(0),rangeQueryWindow(1)(1))
-    /* Close Simba */
-    //println("POINT DF COUNT: " + pointDF.count())
-    //println("POLYGON DF COUNT: " + polyDF.count())
 
+    /* Close Simba */
     simbaSession.stop()
   }
 
