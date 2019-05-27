@@ -27,7 +27,7 @@ val HadoopVersion = "2.7.2"
 
 val GeoSparkVersion = "1.2.0"
 
-val dependencyScope = "compile" //change to "provided" when extracting to jar for cluster. keep as "compile" when running locally
+val dependencyScope = "provided" //change to "provided" when extracting to jar for cluster. keep as "compile" when running locally
 
 logLevel := Level.Warn
 
